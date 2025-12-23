@@ -304,6 +304,13 @@
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    // --- Audio Init ---
+    // Dropbox 링크의 dl=0을 raw=1로 변경하여 직접 스트리밍 가능하게 처리
+    const bgmSrc = "https://www.dropbox.com/scl/fi/u30svprvbf567yxu6g8qz/Sky-Breaker.mp3?rlkey=uwpfomm59h9ct28ds4syi6jy2&st=1r3h4lcl&raw=1";
+    const bgm = new Audio(bgmSrc);
+    bgm.loop = true; // 반복 재생
+    bgm.volume = 0.4; // 볼륨 조절 (0.0 ~ 1.0)
+
     // --- Firebase Init ---
     // 사용자 제공 설정 적용
     const firebaseConfig = {
@@ -388,6 +395,7 @@
                 return;
             }
             let miniHtml = "";
+            // 변경된 부분: slice(0, 5) -> slice(0, 10)
             rankings.slice(0, 10).forEach((r, i) => {
                  miniHtml += `<div style="margin:5px;">${i+1}. ${r.name} - ${r.score}s ${r.plane}</div>`;
             });
@@ -598,6 +606,10 @@
 
     // --- Game Functions ---
     window.startGame = function(type) {
+        // BGM Play
+        bgm.currentTime = 0; // 처음부터 재생
+        bgm.play().catch(e => console.log("BGM Play Error (Interact first):", e));
+
         player.type = type;
         player.x = canvas.width / 2;
         player.y = canvas.height / 2;
@@ -836,6 +848,9 @@
     }
 
     function gameOver() {
+        // BGM Pause
+        bgm.pause();
+
         gameState = 'GAMEOVER';
         hud.classList.add('hidden');
         mobileSkillBtn.classList.add('hidden');
@@ -856,5 +871,4 @@
     }
 </script>
 </body>
-
 </html>
