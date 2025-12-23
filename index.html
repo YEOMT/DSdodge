@@ -252,7 +252,7 @@
             
             <div class="rank-container">
                 <h4 style="color: #aaa; border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 10px;">
-                    🏆 Global Top 5 <span id="loading-spinner" class="spinner hidden"></span>
+                    🏆 Global Top 10 <span id="loading-spinner" class="spinner hidden"></span>
                 </h4>
                 <div id="mini-rank" style="font-size: 14px; color: #888;">불러오는 중...</div>
             </div>
@@ -388,7 +388,7 @@
                 return;
             }
             let miniHtml = "";
-            rankings.slice(0, 5).forEach((r, i) => {
+            rankings.slice(0, 10).forEach((r, i) => {
                  miniHtml += `<div style="margin:5px;">${i+1}. ${r.name} - ${r.score}s ${r.plane}</div>`;
             });
             miniRank.innerHTML = miniHtml;
@@ -856,4 +856,5 @@
     }
 </script>
 </body>
+
 </html>
