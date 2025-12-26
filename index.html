@@ -219,6 +219,18 @@
             margin-left: 10px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Paused Overlay */
+        #paused-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 100;
+        }
 
     </style>
 </head>
@@ -281,6 +293,12 @@
                 </table>
             </div>
         </div>
+        
+        <!-- Paused Message -->
+        <div id="paused-overlay" class="hidden">
+            <h1 style="color: yellow;">PAUSED</h1>
+            <p>게임 화면으로 돌아오면 계속됩니다.</p>
+        </div>
 
         <!-- Joystick (Left) -->
         <div id="joystick-zone" class="hidden">
@@ -305,14 +323,12 @@
     import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // --- Audio Init ---
-    // Dropbox 링크의 dl=0을 raw=1로 변경하여 직접 스트리밍 가능하게 처리
     const bgmSrc = "https://www.dropbox.com/scl/fi/u30svprvbf567yxu6g8qz/Sky-Breaker.mp3?rlkey=uwpfomm59h9ct28ds4syi6jy2&st=1r3h4lcl&raw=1";
     const bgm = new Audio(bgmSrc);
-    bgm.loop = true; // 반복 재생
-    bgm.volume = 0.4; // 볼륨 조절 (0.0 ~ 1.0)
+    bgm.loop = true;
+    bgm.volume = 0.4;
 
     // --- Firebase Init ---
-    // 사용자 제공 설정 적용
     const firebaseConfig = {
       apiKey: "AIzaSyBtK7NAfw4wDsS4LRacWF78PHT3zls50IQ",
       authDomain: "dsgames-fecef.firebaseapp.com",
@@ -327,15 +343,12 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
     
-    // 환경 변수가 없으면 기본값 사용 (사용자 DB 경로 구분을 위함)
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'dsgames-ranking-v1';
 
     let currentUser = null;
 
-    // --- Auth & Initial Load ---
     const initAuth = async () => {
         try {
-            // 사용자 프로젝트이므로 익명 로그인 직접 호출
             await signInAnonymously(auth);
         } catch (error) {
             console.error("Auth failed:", error);
@@ -347,11 +360,10 @@
     onAuthStateChanged(auth, (user) => {
         currentUser = user;
         if (user) {
-            loadGlobalRanking(true); // Load mini rank on start screen
+            loadGlobalRanking(true); 
         }
     });
 
-    // --- Global Ranking Logic ---
     async function loadGlobalRanking(isMini = false) {
         if (!currentUser) return;
 
@@ -359,8 +371,7 @@
         if (isMini) spinner.classList.remove('hidden');
 
         try {
-            // Rule 2 준수: 단순 쿼리로 모든 데이터 가져와서 JS에서 정렬
-            const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'dodge_rankings'));
+            const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'dodge_rankings_V2'));
             
             let rankings = [];
             querySnapshot.forEach((doc) => {
@@ -370,13 +381,9 @@
                 }
             });
 
-            // 내림차순 정렬 (높은 점수가 1등)
             rankings.sort((a, b) => b.score - a.score);
-            
-            // 상위 10개만 유지
             const topRankings = rankings.slice(0, 10);
 
-            // UI 업데이트
             updateRankingUI(topRankings, isMini);
 
         } catch (error) {
@@ -395,7 +402,6 @@
                 return;
             }
             let miniHtml = "";
-            // 변경된 부분: slice(0, 5) -> slice(0, 10)
             rankings.slice(0, 10).forEach((r, i) => {
                  miniHtml += `<div style="margin:5px;">${i+1}. ${r.name} - ${r.score}s ${r.plane}</div>`;
             });
@@ -433,7 +439,7 @@
         btnSave.disabled = true;
 
         try {
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dodge_rankings'), {
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'dodge_rankings_V2'), {
                 name: name,
                 score: parseFloat(score.toFixed(2)),
                 plane: player.emoji,
@@ -441,8 +447,7 @@
                 userId: currentUser.uid
             });
 
-            // 저장 후 랭킹 다시 로드 및 화면 전환
-            await loadGlobalRanking(true); // 미니 랭킹 갱신
+            await loadGlobalRanking(true);
             
             nameInput.value = "";
             document.getElementById('gameover-screen').classList.add('hidden');
@@ -461,7 +466,6 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Resize Canvas
     function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -469,7 +473,6 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     
-    // Elements
     const startScreen = document.getElementById('start-screen');
     const gameoverScreen = document.getElementById('gameover-screen');
     const hud = document.getElementById('hud');
@@ -479,20 +482,45 @@
     const mobileSkillBtn = document.getElementById('mobile-skill-btn');
     const joystickZone = document.getElementById('joystick-zone');
     const joystickStick = document.getElementById('joystick-stick');
+    const pausedOverlay = document.getElementById('paused-overlay');
 
-    // Game State
     let gameState = 'MENU'; 
     let startTime;
     let elapsedTime = 0;
     let animationId;
     let score = 0;
     
-    // Joystick State
+    // Anti-Cheat (Tab Switch Handling)
+    let totalPausedTime = 0;
+    let lastPauseStart = 0;
+
+    document.addEventListener("visibilitychange", () => {
+        if (gameState !== 'PLAYING') return;
+
+        if (document.hidden) {
+            // 화면이 가려지면 일시정지 시작 시간 기록
+            lastPauseStart = Date.now();
+            bgm.pause();
+            pausedOverlay.classList.remove('hidden');
+        } else {
+            // 화면이 돌아오면 쉰 시간만큼 totalPausedTime에 누적
+            if (lastPauseStart > 0) {
+                const pauseDuration = Date.now() - lastPauseStart;
+                totalPausedTime += pauseDuration;
+                lastPauseStart = 0;
+            }
+            bgm.play().catch(()=>{});
+            pausedOverlay.classList.add('hidden');
+            // 애니메이션 루프가 끊겼을 수 있으므로 안전하게 다시 호출
+            cancelAnimationFrame(animationId);
+            animate(); 
+        }
+    });
+
     let joystickData = { x: 0, y: 0, active: false };
     
     const NEON_COLORS = ['#FF00FF', '#00FFFF', '#00FF00', '#FFFF00', '#FF3333', '#FFFFFF'];
 
-    // Player
     const player = {
         x: 400, y: 300, 
         baseSize: 24, 
@@ -512,7 +540,6 @@
     let bulletSpeedMultiplier = 1;
     let lastBulletTime = 0;
 
-    // --- Event Listeners ---
     window.addEventListener('keydown', e => {
         if(keys.hasOwnProperty(e.key)) keys[e.key] = true;
         if(e.key === " " && gameState === 'PLAYING') useSkill();
@@ -528,7 +555,6 @@
     mobileSkillBtn.addEventListener('touchstart', handleSkill, { passive: false });
     mobileSkillBtn.addEventListener('mousedown', handleSkill);
 
-    // Joystick Logic
     const handleJoystickStart = (e) => {
         if (e.cancelable) e.preventDefault();
         joystickData.active = true;
@@ -575,7 +601,6 @@
     document.addEventListener('mousemove', handleJoystickMove); 
     document.addEventListener('mouseup', handleJoystickEnd);
 
-    // Direct Touch Control
     let touchStartX = null;
     let touchStartY = null;
 
@@ -604,11 +629,9 @@
 
     canvas.addEventListener('touchend', (e) => { touchStartX = null; touchStartY = null; });
 
-    // --- Game Functions ---
     window.startGame = function(type) {
-        // BGM Play
-        bgm.currentTime = 0; // 처음부터 재생
-        bgm.play().catch(e => console.log("BGM Play Error (Interact first):", e));
+        bgm.currentTime = 0; 
+        bgm.play().catch(e => console.log("BGM Play Error:", e));
 
         player.type = type;
         player.x = canvas.width / 2;
@@ -638,7 +661,12 @@
         player.speed = player.baseSpeed;
         bullets = [];
         bulletSpeedMultiplier = 1;
+        
+        // Reset Logic Vars
         startTime = Date.now();
+        totalPausedTime = 0;
+        lastPauseStart = 0;
+        
         gameState = 'PLAYING';
         
         startScreen.classList.add('hidden');
@@ -646,12 +674,18 @@
         hud.classList.remove('hidden');
         mobileSkillBtn.classList.remove('hidden');
         joystickZone.classList.remove('hidden');
+        pausedOverlay.classList.add('hidden');
 
         animate();
     }
 
     function animate() {
         if (gameState !== 'PLAYING') return;
+        
+        // 화면이 가려져 있는 상태라면 로직 업데이트 스킵 (혹시라도 루프가 돌 경우 대비)
+        if (document.hidden) {
+            return;
+        }
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'; 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -663,14 +697,21 @@
 
     function updateLogic() {
         const now = Date.now();
-        elapsedTime = (now - startTime) / 1000;
+        // ★ 핵심: 현재 시간에서 '쉬었던 시간(totalPausedTime)'을 뺍니다.
+        elapsedTime = (now - startTime - totalPausedTime) / 1000;
+        
+        if (elapsedTime < 0) elapsedTime = 0; // 안전장치
         score = elapsedTime;
 
         bulletSpeedMultiplier = 1 + (elapsedTime * 0.03); 
         const baseSpawnRate = Math.max(20, 500 - (elapsedTime * 20)); 
         const spawnRate = Math.max(15, baseSpawnRate / 1.5);
 
-        if (now - lastBulletTime > spawnRate) {
+        if (now - lastBulletTime - (document.hidden ? 999999 : 0) > spawnRate) {
+             // 탭 비활성 상태에서는 총알 생성 로직도 시간차 문제로 꼬일 수 있으므로 주의
+             // 다만 animate()가 hidden일 때 멈추므로 여기까진 잘 안 옴.
+             // 안전하게 lastBulletTime 갱신 시에도 보정 필요할 수 있으나, 
+             // 현재 구조상 requestAnimationFrame이 멈추면 이 함수도 안 불리므로 괜찮음.
             spawnBullet();
             lastBulletTime = now;
         }
@@ -848,17 +889,15 @@
     }
 
     function gameOver() {
-        // BGM Pause
         bgm.pause();
-
         gameState = 'GAMEOVER';
         hud.classList.add('hidden');
         mobileSkillBtn.classList.add('hidden');
         joystickZone.classList.add('hidden');
+        pausedOverlay.classList.add('hidden');
         gameoverScreen.classList.remove('hidden');
         finalScoreDisplay.innerText = score.toFixed(2);
         
-        // Load Global Ranking (Full List)
         loadGlobalRanking(false);
     }
 
